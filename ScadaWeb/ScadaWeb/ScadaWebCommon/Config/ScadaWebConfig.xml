@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ScadaWebConfig>
   <GeneralOptions>
     <DefaultCulture></DefaultCulture>
@@ -64,7 +64,7 @@
       <Option name="EventDepth" value="2" />
       <Option name="MaxReportPeriod" value="31" />
       <Option name="CommandPassword" value="false" />
-      <Option name="AllowAuthApi" value="false" />
+      <Option name="AllowAuthApi" value="true" />
     </OptionGroup>
     <OptionGroup name="Scheme">
       <!-- ScaleType: Numeric | FitScreen | FitWidth -->
