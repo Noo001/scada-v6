@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2026 Rapid Software LLC
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -218,6 +218,9 @@ namespace Scada.Web
             app.UseSession();
             app.MapRazorPages();
             app.MapControllers();
+
+            // RatioT: Angular SPA fallback (app/index.html из wwwroot)
+            app.MapFallbackToFile("app/index.html").AllowAnonymous();
         }
 
 

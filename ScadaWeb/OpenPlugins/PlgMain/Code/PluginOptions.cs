@@ -1,4 +1,4 @@
-﻿// Copyright (c) Rapid Software LLC. All rights reserved.
+// Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Scada.Config;
@@ -25,7 +25,7 @@ namespace Scada.Web.Plugins.PlgMain.Code
             EventDepth = options.GetValueAsInt("EventDepth", 2);
             MaxReportPeriod = options.GetValueAsInt("MaxReportPeriod", 31);
             CommandPassword = options.GetValueAsBool("CommandPassword");
-            AllowAuthApi = options.GetValueAsBool("AllowAuthApi");
+            AllowAuthApi = options.GetValueAsBool("AllowAuthApi", true); // RatioT: SPA-вход через API включён по умолчанию
         }
 
 

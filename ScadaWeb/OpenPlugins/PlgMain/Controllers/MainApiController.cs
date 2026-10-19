@@ -1,4 +1,4 @@
-﻿// Copyright (c) Rapid Software LLC. All rights reserved.
+// Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +14,7 @@ using Scada.Web.Lang;
 using Scada.Web.Plugins.PlgMain.Code;
 using Scada.Web.Plugins.PlgMain.Models;
 using Scada.Web.Services;
+using Scada.Web.TreeView;
 using Scada.Web.Users;
 
 namespace Scada.Web.Plugins.PlgMain.Controllers
@@ -55,6 +56,20 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
             this.viewLoader = viewLoader;
             this.memoryCache = memoryCache;
             this.pluginContext = pluginContext;
+        }
+
+
+        /// <summary>
+        /// Represents a tree node of the main menu or view explorer for the SPA client.
+        /// <para>Представляет узел дерева главного меню или проводника представлений для SPA-клиента.</para>
+        /// </summary>
+        private sealed class TreeNodeDto
+        {
+            public string Text { get; set; } = "";
+            public string Url { get; set; } = "";
+            public int ViewID { get; set; }
+            public string FrameUrl { get; set; } = "";
+            public List<TreeNodeDto> Children { get; } = [];
         }
 
 
@@ -564,6 +579,55 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
             return viewLoader.GetView(viewID, out ViewBase view, out string errMsg)
                 ? Dto<string>.Success(view.GetType().Name)
                 : Dto<string>.Fail(errMsg);
+        }
+
+        /// <summary>
+        /// Gets the main menu and view explorer as JSON trees for the SPA client.
+        /// <para>Возвращает главное меню и проводник представлений в виде JSON-деревьев для SPA-клиента.</para>
+        /// </summary>
+        public Dto<object> GetViewTree()
+        {
+            static TreeNodeDto ConvertMenuItem(MenuItem menuItem)
+            {
+                TreeNodeDto node = new() { Text = menuItem.Text, Url = menuItem.Url };
+
+                foreach (MenuItem subitem in menuItem.Subitems)
+                {
+                    node.Children.Add(ConvertMenuItem(subitem));
+                }
+
+                return node;
+            }
+
+            static TreeNodeDto ConvertViewNode(ViewNode viewNode)
+            {
+                TreeNodeDto node = new()
+                {
+                    Text = viewNode.Text,
+                    ViewID = viewNode.ViewID,
+                    FrameUrl = viewNode.ViewFrameUrl
+                };
+
+                foreach (ViewNode childNode in viewNode.ChildNodes)
+                {
+                    node.Children.Add(ConvertViewNode(childNode));
+                }
+
+                return node;
+            }
+
+            try
+            {
+                return Dto<object>.Success(new
+                {
+                    Menu = userContext.Menu.MenuItems.ConvertAll(ConvertMenuItem),
+                    Views = userContext.Views.ViewNodes.ConvertAll(ConvertViewNode)
+                });
+            }
+            catch (Exception ex)
+            {
+                return Dto<object>.Fail(ex.Message);
+            }
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿// Copyright (c) Rapid Software LLC. All rights reserved.
+// Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +16,8 @@ namespace Scada.Web.Pages
     {
         public IActionResult OnGet()
         {
-            return RedirectToPage(WebPath.LoginPage);
+            // RatioT: стартовая точка — Angular SPA (бывш. RedirectToPage(WebPath.LoginPage))
+            return LocalRedirect("/app/");
         }
     }
 }
