@@ -6,6 +6,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Scada.Data.Const;
 using Scada.Data.Entities;
 using Scada.Data.Models;
+using Scada.Lang;
 using Scada.Protocol;
 using Scada.Web.Api;
 using Scada.Web.Audit;
@@ -568,6 +569,52 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
             {
                 webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(GetArcWriteTime)));
                 return Dto<long>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Acknowledges the event. RatioT: API for the SPA client.
+        /// <para>Квитирует событие. RatioT: API для SPA-клиента.</para>
+        /// </summary>
+        public Dto AckEvent(long eventID, int archiveBit = -1)
+        {
+            try
+            {
+                int resolvedArchiveBit = archiveBit >= 0
+                    ? archiveBit
+                    : webContext.ConfigDatabase.FindArchiveBit(
+                        pluginContext.Options.EventArchiveCode, ArchiveBit.Event);
+
+                Event ev = clientAccessor.ScadaClient.GetEventByID(resolvedArchiveBit, eventID);
+
+                if (ev == null)
+                {
+                    return Dto.Fail(string.Format(Locale.IsRussian ?
+                        "Событие с ид. {0} не найдено" :
+                        "Event with ID {0} not found", eventID));
+                }
+
+                if (!userContext.Rights.GetRightByObj(ev.ObjNum).Control)
+                {
+                    return Dto.Fail(WebPhrases.AccessDenied);
+                }
+
+                clientAccessor.ScadaClient.AckEvent(new EventAck
+                {
+                    EventID = eventID,
+                    Timestamp = DateTime.UtcNow,
+                    UserID = User.GetUserID()
+                });
+
+                webContext.Log.WriteAction(Locale.IsRussian ?
+                    "Квитировано событие с ид. {0}" :
+                    "Acknowledged event with ID {0}", eventID);
+                return Dto.Success();
+            }
+            catch (Exception ex)
+            {
+                webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(AckEvent)));
+                return Dto.Fail(ex.Message);
             }
         }
 
