@@ -327,7 +327,7 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
         {
             try
             {
-                IntRange cnlNums = memoryCache.Get<IntRange>(PluginUtils.GetCacheKey("CnlList", cnlListID));
+                IList<int> cnlNums = memoryCache.Get<IList<int>>(PluginUtils.GetCacheKey("CnlList", cnlListID));
                 CurData curData = RequestCurData(cnlNums, cnlListID, true, appendUnit);
                 return Dto<CurData>.Success(curData);
             }
@@ -353,6 +353,16 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
                         entry.SetAbsoluteExpiration(DataCacheExpiration);
                         return RequestCurData(view.CnlNumList, cnlListID, true, appendUnit);
                     });
+
+                    // Allow incremental polling via GetCurDataStep2 with the token
+                    // returned here, mirroring GetCurDataStep1.
+                    if (curData.CnlListID != "0")
+                    {
+                        memoryCache.Set(
+                            PluginUtils.GetCacheKey("CnlList", curData.CnlListID),
+                            view.CnlNumList,
+                            new MemoryCacheEntryOptions { SlidingExpiration = WebUtils.CacheExpiration });
+                    }
 
                     return Dto<CurData>.Success(curData);
                 }
@@ -669,6 +679,37 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
                 {
                     Menu = userContext.Menu.MenuItems.ConvertAll(ConvertMenuItem),
                     Views = userContext.Views.ViewNodes.ConvertAll(ConvertViewNode)
+                });
+            }
+            catch (Exception ex)
+            {
+                return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Gets the report list for the current user as a JSON tree.
+        /// <para>Возвращает список отчётов текущего пользователя в виде JSON-дерева.</para>
+        /// </summary>
+        public Dto<object> GetReportList()
+        {
+            static TreeNodeDto ConvertMenuItem(MenuItem menuItem)
+            {
+                TreeNodeDto node = new() { Text = menuItem.Text, Url = menuItem.Url };
+
+                foreach (MenuItem subitem in menuItem.Subitems)
+                {
+                    node.Children.Add(ConvertMenuItem(subitem));
+                }
+
+                return node;
+            }
+
+            try
+            {
+                return Dto<object>.Success(new
+                {
+                    Reports = userContext.Reports.MenuItems.ConvertAll(ConvertMenuItem)
                 });
             }
             catch (Exception ex)
