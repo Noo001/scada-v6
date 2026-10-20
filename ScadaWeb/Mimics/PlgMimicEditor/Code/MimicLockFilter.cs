@@ -1,4 +1,4 @@
-﻿// Copyright (c) Rapid Software LLC. All rights reserved.
+// Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -16,7 +16,7 @@ namespace Scada.Web.Plugins.PlgMimicEditor.Code
 
         public void OnActionExecuting(ActionExecutingContext context)
         {
-            if (context.ActionArguments["key"] is long key &&
+            if (context.ActionArguments.TryGetValue("key", out object arg) && arg is long key &&
                 editorManager.FindMimic(key, out MimicInstance mimicInstance, out _))
             {
                 mimic = mimicInstance.Mimic;
