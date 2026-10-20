@@ -1,4 +1,4 @@
-﻿// Copyright (c) Rapid Software LLC. All rights reserved.
+// Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Microsoft.AspNetCore.Mvc;
@@ -30,8 +30,9 @@ namespace Scada.Web.Plugins.PlgMimic.Controllers
         /// </summary>
         private bool CheckRights(Component component)
         {
+            // RatioT: компонент без привязок — статический, права на каналы не нужны
             if (component.Bindings == null)
-                return false;
+                return true;
 
             if (userContext.Rights.ViewAll || !component.Bindings.CheckRights)
                 return true;
