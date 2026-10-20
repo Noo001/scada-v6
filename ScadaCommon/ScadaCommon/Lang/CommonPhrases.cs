@@ -149,7 +149,7 @@ namespace Scada.Lang
         static CommonPhrases()
         {
             // the phrases below may be required before loading dictionaries
-            ProductName = "Rapid SCADA";
+            ProductName = "RatioT.SCADA";
 
             if (Locale.IsRussian)
             {

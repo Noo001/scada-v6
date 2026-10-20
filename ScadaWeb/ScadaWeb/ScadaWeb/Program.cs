@@ -208,6 +208,29 @@ namespace Scada.Web
             }
 
             app.UseStaticFiles();
+
+            // RatioT: legacy Razor-страницы перекрыты — весь UI идёт через SPA /app/.
+            app.Use((context, next) =>
+            {
+                if (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
+                {
+                    string[] legacyPrefixes = { "/Main", "/Mimic", "/MimicEditor", "/Scheme", "/Chart",
+                        "/UserProfile", "/Login", "/Logout", "/View", "/About", "/Reports",
+                        "/CnlSelect", "/ConfigReload" };
+
+                    foreach (string prefix in legacyPrefixes)
+                    {
+                        if (context.Request.Path.StartsWithSegments(prefix,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            context.Response.Redirect("/app/");
+                            return Task.CompletedTask;
+                        }
+                    }
+                }
+                return next();
+            });
+
             app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/api"), webApp =>
             {
                 webApp.UseStatusCodePagesWithReExecute("/Errors/{0}");

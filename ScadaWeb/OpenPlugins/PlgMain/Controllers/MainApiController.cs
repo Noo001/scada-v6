@@ -6,6 +6,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Scada.Data.Const;
 using Scada.Data.Entities;
 using Scada.Data.Models;
+using Scada.Data.Tables;
 using Scada.Lang;
 using Scada.Protocol;
 using Scada.Web.Api;
@@ -715,6 +716,132 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
             catch (Exception ex)
             {
                 return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Gets the numbers of available objects starting from the specified object.
+        /// </summary>
+        private List<int> GetObjNumHierarchy(int startObjNum)
+        {
+            List<int> objNums = [startObjNum];
+
+            if (!webContext.ConfigDatabase.ObjTable.TryGetIndex("ParentObjNum", out ITableIndex parentObjIndex))
+                throw new ScadaException(CommonPhrases.IndexNotFound);
+
+            void AddChildObjects(int parentObjNum)
+            {
+                foreach (Obj childObj in parentObjIndex.SelectItems(parentObjNum))
+                {
+                    if (userContext.Rights.GetRightByObj(childObj.ObjNum).View)
+                    {
+                        objNums.Add(childObj.ObjNum);
+                        AddChildObjects(childObj.ObjNum);
+                    }
+                }
+            }
+
+            AddChildObjects(startObjNum);
+            return objNums;
+        }
+
+        /// <summary>
+        /// Gets the archive list from the configuration database.
+        /// <para>Возвращает список архивов из базы конфигурации.</para>
+        /// </summary>
+        public Dto<object> GetArchiveList()
+        {
+            try
+            {
+                return Dto<object>.Success(new
+                {
+                    Archives = webContext.ConfigDatabase.ArchiveTable
+                        .OrderBy(a => a.Name)
+                        .Select(a => new
+                        {
+                            a.ArchiveID,
+                            a.Code,
+                            a.Name,
+                            a.Bit,
+                            a.ArchiveKindID
+                        })
+                        .ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Gets the object list available to the current user.
+        /// <para>Возвращает список объектов, доступных текущему пользователю.</para>
+        /// </summary>
+        public Dto<object> GetObjList()
+        {
+            try
+            {
+                return Dto<object>.Success(new
+                {
+                    Objects = userContext.Objects
+                        .Select(o => new
+                        {
+                            o.ObjNum,
+                            o.Text,
+                            o.Right.View
+                        })
+                        .ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Gets the events for the period with the specified filters.
+        /// <para>Возвращает события за период с указанными фильтрами.</para>
+        /// </summary>
+        public Dto<EventPacket> GetEventsFiltered(int archiveBit, DateTime startTime, DateTime endTime,
+            bool endInclusive, int objNum, IntRange severities, int limit)
+        {
+            try
+            {
+                TimeRange timeRange = userContext.CreateTimeRangeUtc(startTime, endTime, endInclusive);
+                UserRights rights = userContext.Rights;
+
+                EventPacket eventPacket = RequestEvents(archiveBit, timeRange, 0, false, () =>
+                {
+                    EventFilter eventFilter = new(limit, rights);
+
+                    if (objNum > 0)
+                    {
+                        if (!rights.GetRightByObj(objNum).View)
+                            throw new AccessDeniedException();
+
+                        eventFilter.AddCondition("ObjNum", FilterOperator.In, GetObjNumHierarchy(objNum));
+                    }
+
+                    if (severities != null && severities.Count > 0)
+                    {
+                        eventFilter.AddCondition("Severity", FilterOperator.In, severities.ToList());
+                    }
+
+                    return eventFilter;
+                });
+
+                return Dto<EventPacket>.Success(eventPacket);
+            }
+            catch (AccessDeniedException ex)
+            {
+                return Dto<EventPacket>.Fail(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(GetEventsFiltered)));
+                return Dto<EventPacket>.Fail(ex.Message);
             }
         }
 

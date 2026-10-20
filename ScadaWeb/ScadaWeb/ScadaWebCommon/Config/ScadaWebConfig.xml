@@ -5,7 +5,7 @@
     <DefaultTimeZone></DefaultTimeZone>
     <DefaultStartPage></DefaultStartPage>
     <EnableCommands>true</EnableCommands>
-    <ShareStats>true</ShareStats>
+    <ShareStats>false</ShareStats>
     <MaxLogSize>1</MaxLogSize>
   </GeneralOptions>
   <ConnectionOptions>
