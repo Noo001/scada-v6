@@ -68,7 +68,12 @@ namespace Scada.Web.Plugins.PlgMimicEditor.Controllers
                 if (string.IsNullOrEmpty(path))
                     return Dto<object>.Fail("Path is required.");
 
-                OpenResult openResult = editorManager.OpenMimic(path);
+                // RatioT: относительные пути разрешаются относительно каталога Views инстанса
+                string fullPath = Path.IsPathRooted(path)
+                    ? path
+                    : Path.Combine(webContext.AppDirs.InstanceDir, "Views", Scada.ScadaUtils.NormalPathSeparators(path));
+
+                OpenResult openResult = editorManager.OpenMimic(fullPath);
 
                 return openResult.IsSuccessful
                     ? Dto<object>.Success(new { openResult.MimicKey })
@@ -77,6 +82,35 @@ namespace Scada.Web.Plugins.PlgMimicEditor.Controllers
             catch (Exception ex)
             {
                 webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(OpenMimic)));
+                return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Gets the list of mimic files in the instance Views directory.
+        /// <para>Возвращает список файлов мнемосхем в каталоге Views инстанса.</para>
+        /// </summary>
+        public Dto<object> GetMimicFiles()
+        {
+            try
+            {
+                string viewsDir = Path.Combine(webContext.AppDirs.InstanceDir, "Views");
+                List<string> files = [];
+
+                if (Directory.Exists(viewsDir))
+                {
+                    foreach (string fileName in Directory.EnumerateFiles(viewsDir, "*.mim", SearchOption.AllDirectories))
+                    {
+                        files.Add(Scada.ScadaUtils.NormalPathSeparators(
+                            Path.GetRelativePath(viewsDir, fileName)));
+                    }
+                }
+
+                return Dto<object>.Success(new { Files = files.OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList() });
+            }
+            catch (Exception ex)
+            {
+                webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(GetMimicFiles)));
                 return Dto<object>.Fail(ex.Message);
             }
         }
