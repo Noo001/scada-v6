@@ -43,7 +43,7 @@ namespace Scada.Web.Plugins.PlgMimicEditor.Controllers
                                 .Select(m => new
                                 {
                                     m.FileName,
-                                    m.MimicKey
+                                    MimicKey = m.MimicKey.ToString()
                                 })
                                 .ToList()
                         })
@@ -75,8 +75,9 @@ namespace Scada.Web.Plugins.PlgMimicEditor.Controllers
 
                 OpenResult openResult = editorManager.OpenMimic(fullPath);
 
+                // RatioT: ключ сериализуем строкой — int64 теряет точность в JSON.number
                 return openResult.IsSuccessful
-                    ? Dto<object>.Success(new { openResult.MimicKey })
+                    ? Dto<object>.Success(new { MimicKey = openResult.MimicKey.ToString() })
                     : Dto<object>.Fail(openResult.ErrorMessage);
             }
             catch (Exception ex)
