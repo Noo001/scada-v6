@@ -1,6 +1,8 @@
 // Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System.Globalization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Scada.Data.Const;
@@ -34,6 +36,12 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
         /// The cache expiration for archive data.
         /// </summary>
         private static readonly TimeSpan DataCacheExpiration = TimeSpan.FromMilliseconds(500);
+
+        /// <summary>
+        /// The HTTP client for proxying open data sources on the Live page.
+        /// <para>HTTP-клиент для проксирования открытых источников данных на странице «Живые датчики».</para>
+        /// </summary>
+        private static readonly HttpClient LiveHttpClient = CreateLiveHttpClient();
 
         private readonly IWebContext webContext;
         private readonly IUserContext userContext;
@@ -114,8 +122,7 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
         /// <summary>
         /// Requests the current data from the server.
         /// </summary>
-        private CurData RequestCurData(IList<int> cnlNums, long cnlListID, bool useCache, bool appendUnit)
-        {
+        private CurData RequestCurData(IList<int> cnlNums, long cnlListID, bool useCache, bool appendUnit)        {
             cnlNums ??= Array.Empty<int>();
             int cnlCnt = cnlNums.Count;
             CurDataRecord[] records = new CurDataRecord[cnlCnt];
@@ -843,6 +850,101 @@ namespace Scada.Web.Plugins.PlgMain.Controllers
                 webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(GetEventsFiltered)));
                 return Dto<EventPacket>.Fail(ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Creates the HTTP client for proxying open data sources.
+        /// <para>Создаёт HTTP-клиент для проксирования открытых источников данных.</para>
+        /// </summary>
+        private static HttpClient CreateLiveHttpClient()
+        {
+            HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RatioT.SCADA/6.5 (support@dkc.ru)");
+            httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            return httpClient;
+        }
+
+        /// <summary>
+        /// Downloads a JSON document from an open data source and wraps it in a DTO.
+        /// <para>Скачивает JSON-документ из открытого источника данных и оборачивает его в DTO.</para>
+        /// </summary>
+        private async Task<Dto<object>> ProxyLiveJsonAsync(string requestUri, string actionName)
+        {
+            try
+            {
+                HttpResponseMessage response = await LiveHttpClient.GetAsync(requestUri);
+                response.EnsureSuccessStatusCode();
+                string content = await response.Content.ReadAsStringAsync();
+                object json = JsonSerializer.Deserialize<object>(content);
+                return Dto<object>.Success(json);
+            }
+            catch (Exception ex)
+            {
+                webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, actionName));
+                return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Proxies the weather forecast from MET Norway for the given comma-separated coordinates.
+        /// <para>Проксирует прогноз погоды MET Norway для заданных координат через запятую.</para>
+        /// </summary>
+        public async Task<Dto<object>> LiveWeather(string lat, string lon)
+        {
+            string[] lats = (lat ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            string[] lons = (lon ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (lats.Length == 0 || lats.Length != lons.Length)
+                return Dto<object>.Fail("Invalid coordinates");
+
+            try
+            {
+                List<object> results = new(capacity: lats.Length);
+
+                for (int i = 0; i < lats.Length; i++)
+                {
+                    string requestUri = string.Format(CultureInfo.InvariantCulture,
+                        "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat={0}&lon={1}",
+                        lats[i], lons[i]);
+                    HttpResponseMessage response = await LiveHttpClient.GetAsync(requestUri);
+                    response.EnsureSuccessStatusCode();
+                    string content = await response.Content.ReadAsStringAsync();
+                    results.Add(JsonSerializer.Deserialize<object>(content));
+                }
+
+                return Dto<object>.Success(results);
+            }
+            catch (Exception ex)
+            {
+                webContext.Log.WriteError(ex.BuildErrorMessage(WebPhrases.ErrorInWebApi, nameof(LiveWeather)));
+                return Dto<object>.Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Proxies the air quality index from Open-Meteo CAMS for the given comma-separated coordinates.
+        /// <para>Проксирует индекс качества воздуха Open-Meteo CAMS для заданных координат через запятую.</para>
+        /// </summary>
+        public Task<Dto<object>> LiveAir(string latitude, string longitude)
+        {
+            return ProxyLiveJsonAsync(
+                "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=" +
+                Uri.EscapeDataString(latitude ?? "") +
+                "&longitude=" + Uri.EscapeDataString(longitude ?? "") +
+                "&current=european_aqi,pm10,pm2_5,nitrogen_dioxide",
+                nameof(LiveAir));
+        }
+
+        /// <summary>
+        /// Proxies the Rhine water levels from PEGELONLINE.
+        /// <para>Проксирует уровни воды Рейна из PEGELONLINE.</para>
+        /// </summary>
+        public Task<Dto<object>> LiveRiver()
+        {
+            return ProxyLiveJsonAsync(
+                "https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json" +
+                "?includeTimeseries=true&includeCurrentMeasurement=true&waters=RHEIN",
+                nameof(LiveRiver));
         }
 
         /// <summary>
