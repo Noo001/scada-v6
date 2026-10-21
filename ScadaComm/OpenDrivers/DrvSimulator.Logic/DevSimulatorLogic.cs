@@ -1,4 +1,4 @@
-﻿// Copyright (c) Rapid Software LLC. All rights reserved.
+// Copyright (c) Rapid Software LLC. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Scada.Comm.Config;
@@ -38,6 +38,10 @@ namespace Scada.Comm.Drivers.DrvSimulator.Logic
         /// The array containing random values.
         /// </summary>
         private double[] randomArray = null;
+        /// <summary>
+        /// Indicates that the relay state has been initialized.
+        /// </summary>
+        private bool relayStateInitialized = false;
 
 
         /// <summary>
@@ -110,8 +114,23 @@ namespace Scada.Comm.Drivers.DrvSimulator.Logic
             base.Session();
             SimulateInputs();
             SimulateArray();
+            InitRelayState();
             FinishRequest();
             FinishSession();
+        }
+
+        /// <summary>
+        /// The relay state is only set on command, so give the tag a defined
+        /// value once at startup. Otherwise a channel bound to the relay shows
+        /// an undefined value until the first command arrives.
+        /// </summary>
+        private void InitRelayState()
+        {
+            if (!relayStateInitialized)
+            {
+                relayStateInitialized = true;
+                DeviceData.Set(TagCode.DO, 0.0);
+            }
         }
 
         /// <summary>
